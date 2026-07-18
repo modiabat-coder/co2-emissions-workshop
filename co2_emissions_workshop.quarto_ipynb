@@ -1,0 +1,287 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "---\n",
+        "title: \"Workshop Exercise: Emissions Data - Table, Map, and Chart\"\n",
+        "\n",
+        "format:\n",
+        "  html:\n",
+        "    toc: true\n",
+        "\n",
+        "execute:\n",
+        "  echo: false\n",
+        "  warning: false\n",
+        "  message: false\n",
+        "---\n",
+        "\n",
+        "# Introduction\n",
+        "\n",
+        "In this exercise, you will work with a CO2 emissions dataset downloaded from Gapminder and produce a report with three tabs: a data table, a line chart, and a choropleth map.\n",
+        "\n",
+        "The goal is to roughly replicate the [Our World in Data visualization page on consumption-based CO<sub>2</sub> emissions](https://ourworldindata.org/grapher/consumption-co2-emissions?tab=table&time=2000..2022).\n",
+        "\n",
+        "Be sure to view that page to get an idea of the final product.\n",
+        "\n",
+        "# Setup\n",
+        "\n",
+        "- You should have forked and cloned this repository to your local machine.\n",
+        "- Create and select a virtual environment in VS Code.\n",
+        "- Install the following packages:\n",
+        "  - pandas\n",
+        "  - plotly\n",
+        "  - itables\n",
+        "  - ipykernel\n",
+        "  - jupyter\n",
+        "- Download the Gapminder `CO2 Total emissions` dataset and save it inside a folder named `data`.\n",
+        "\n",
+        "# Data Import"
+      ],
+      "id": "e90c0af0"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "import pandas as pd\n",
+        "import plotly.express as px\n",
+        "from itables import show"
+      ],
+      "id": "2a845933",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "# Load the data using a relative path\n",
+        "emissions = pd.read_csv(\"data/co2_cons.csv\")"
+      ],
+      "id": "534d2950",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "# Table Section\n",
+        "\n",
+        "Our goal is to create a table showing emissions for selected years and calculate absolute and relative changes."
+      ],
+      "id": "cf4b80ba"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "# Subset the data to include name, 2000, and 2022\n",
+        "table_df = emissions[[\"name\", \"2000\", \"2022\"]].copy()\n",
+        "\n",
+        "# Calculate absolute change\n",
+        "table_df[\"Absolute Change\"] = (\n",
+        "    table_df[\"2022\"] - table_df[\"2000\"]\n",
+        ")\n",
+        "\n",
+        "# Calculate relative change\n",
+        "table_df[\"Relative Change\"] = (\n",
+        "    table_df[\"Absolute Change\"] / table_df[\"2000\"]\n",
+        ") * 100\n",
+        "\n",
+        "# Round to 0 decimal places and add a percentage sign\n",
+        "table_df[\"Relative Change\"] = (\n",
+        "    table_df[\"Relative Change\"]\n",
+        "    .round(0)\n",
+        "    .astype(str)\n",
+        "    + \"%\"\n",
+        ")"
+      ],
+      "id": "70473d3c",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "# Chart Section\n",
+        "\n",
+        "Our goal is to create a line chart from 1990 to 2022 for five selected countries."
+      ],
+      "id": "f0808b9b"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "# Reshape the dataset from wide to long format\n",
+        "emissions_long = emissions.melt(\n",
+        "    id_vars=[\"geo\", \"name\"],\n",
+        "    var_name=\"year\",\n",
+        "    value_name=\"emissions\",\n",
+        ")\n",
+        "\n",
+        "# Convert year to numeric\n",
+        "emissions_long[\"year\"] = pd.to_numeric(\n",
+        "    emissions_long[\"year\"],\n",
+        "    errors=\"coerce\",\n",
+        ")\n",
+        "\n",
+        "# Convert emissions to numeric and replace the unicode minus sign\n",
+        "emissions_long[\"emissions\"] = pd.to_numeric(\n",
+        "    emissions_long[\"emissions\"]\n",
+        "    .astype(str)\n",
+        "    .str.replace(\"−\", \"-\"),\n",
+        "    errors=\"coerce\",\n",
+        ")\n",
+        "\n",
+        "# Keep years from 1990 to 2022\n",
+        "emissions_long_1990_2022 = emissions_long.query(\n",
+        "    \"1990 <= year <= 2022\"\n",
+        ").copy()\n",
+        "\n",
+        "# Select five countries\n",
+        "emissions_long_subset = emissions_long_1990_2022.query(\n",
+        "    \"name in ['Germany', 'France', 'Italy', 'Spain', 'United Kingdom']\"\n",
+        ")\n",
+        "\n",
+        "# Create the line chart\n",
+        "fig_chart = px.line(\n",
+        "    emissions_long_subset,\n",
+        "    x=\"year\",\n",
+        "    y=\"emissions\",\n",
+        "    color=\"name\",\n",
+        "    title=\"CO₂ Emissions (1990–2022)\",\n",
+        "    labels={\n",
+        "        \"year\": \"Year\",\n",
+        "        \"emissions\": \"CO₂ emissions\",\n",
+        "        \"name\": \"Country\",\n",
+        "    },\n",
+        ")"
+      ],
+      "id": "b3774a52",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "# Mapping Section\n",
+        "\n",
+        "The goal is to create an animated choropleth map showing global emissions from 1990 to 2022."
+      ],
+      "id": "075269ff"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "# Convert the existing ISO3 codes to uppercase\n",
+        "emissions_long_1990_2022[\"country_code\"] = (\n",
+        "    emissions_long_1990_2022[\"geo\"].str.upper()\n",
+        ")\n",
+        "\n",
+        "# Create the animated choropleth map\n",
+        "fig_map = px.choropleth(\n",
+        "    emissions_long_1990_2022,\n",
+        "    locations=\"country_code\",\n",
+        "    color=\"emissions\",\n",
+        "    hover_name=\"name\",\n",
+        "    animation_frame=\"year\",\n",
+        "    title=\"Global CO₂ Emissions (1990–2022)\",\n",
+        "    labels={\n",
+        "        \"emissions\": \"CO₂ emissions\",\n",
+        "        \"year\": \"Year\",\n",
+        "    },\n",
+        ")"
+      ],
+      "id": "1f0b3f4d",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "# Results\n",
+        "\n",
+        "::: {.panel-tabset}\n",
+        "\n",
+        "## Table"
+      ],
+      "id": "d46cdb0b"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "show(table_df)"
+      ],
+      "id": "7a202061",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Chart"
+      ],
+      "id": "04b2ced4"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "fig_chart.show()"
+      ],
+      "id": "ce5f5e6f",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Map"
+      ],
+      "id": "1cc479b6"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "fig_map.show()"
+      ],
+      "id": "3c0a9554",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        ":::\n",
+        "\n",
+        "# Deploying to GitHub Pages\n",
+        "\n",
+        "As a final step, follow the steps outlined in the prework to deploy the report to GitHub Pages. You will be asked to share a link to the report in the course portal."
+      ],
+      "id": "c25bb4ad"
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "name": "pages_lesson",
+      "language": "python",
+      "display_name": "Python (pages_lesson)",
+      "path": "C:\\Users\\ASUS\\AppData\\Roaming\\jupyter\\kernels\\pages_lesson"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}

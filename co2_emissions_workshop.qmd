@@ -1,0 +1,176 @@
+---
+title: "Workshop Exercise: Emissions Data - Table, Map, and Chart"
+
+format:
+  html:
+    toc: true
+
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+# Introduction
+
+In this exercise, you will work with a CO2 emissions dataset downloaded from Gapminder and produce a report with three tabs: a data table, a line chart, and a choropleth map.
+
+The goal is to roughly replicate the [Our World in Data visualization page on consumption-based CO<sub>2</sub> emissions](https://ourworldindata.org/grapher/consumption-co2-emissions?tab=table&time=2000..2022).
+
+Be sure to view that page to get an idea of the final product.
+
+# Setup
+
+- You should have forked and cloned this repository to your local machine.
+- Create and select a virtual environment in VS Code.
+- Install the following packages:
+  - pandas
+  - plotly
+  - itables
+  - ipykernel
+  - jupyter
+- Download the Gapminder `CO2 Total emissions` dataset and save it inside a folder named `data`.
+
+# Data Import
+
+```{python}
+import pandas as pd
+import plotly.express as px
+from itables import show
+```
+
+```{python}
+# Load the data using a relative path
+emissions = pd.read_csv("data/co2_cons.csv")
+```
+
+# Table Section
+
+Our goal is to create a table showing emissions for selected years and calculate absolute and relative changes.
+
+```{python}
+# Subset the data to include name, 2000, and 2022
+table_df = emissions[["name", "2000", "2022"]].copy()
+
+# Calculate absolute change
+table_df["Absolute Change"] = (
+    table_df["2022"] - table_df["2000"]
+)
+
+# Calculate relative change
+table_df["Relative Change"] = (
+    table_df["Absolute Change"] / table_df["2000"]
+) * 100
+
+# Round to 0 decimal places and add a percentage sign
+table_df["Relative Change"] = (
+    table_df["Relative Change"]
+    .round(0)
+    .astype(str)
+    + "%"
+)
+```
+
+# Chart Section
+
+Our goal is to create a line chart from 1990 to 2022 for five selected countries.
+
+```{python}
+# Reshape the dataset from wide to long format
+emissions_long = emissions.melt(
+    id_vars=["geo", "name"],
+    var_name="year",
+    value_name="emissions",
+)
+
+# Convert year to numeric
+emissions_long["year"] = pd.to_numeric(
+    emissions_long["year"],
+    errors="coerce",
+)
+
+# Convert emissions to numeric and replace the unicode minus sign
+emissions_long["emissions"] = pd.to_numeric(
+    emissions_long["emissions"]
+    .astype(str)
+    .str.replace("−", "-"),
+    errors="coerce",
+)
+
+# Keep years from 1990 to 2022
+emissions_long_1990_2022 = emissions_long.query(
+    "1990 <= year <= 2022"
+).copy()
+
+# Select five countries
+emissions_long_subset = emissions_long_1990_2022.query(
+    "name in ['Germany', 'France', 'Italy', 'Spain', 'United Kingdom']"
+)
+
+# Create the line chart
+fig_chart = px.line(
+    emissions_long_subset,
+    x="year",
+    y="emissions",
+    color="name",
+    title="CO₂ Emissions (1990–2022)",
+    labels={
+        "year": "Year",
+        "emissions": "CO₂ emissions",
+        "name": "Country",
+    },
+)
+```
+
+# Mapping Section
+
+The goal is to create an animated choropleth map showing global emissions from 1990 to 2022.
+
+```{python}
+# Convert the existing ISO3 codes to uppercase
+emissions_long_1990_2022["country_code"] = (
+    emissions_long_1990_2022["geo"].str.upper()
+)
+
+# Create the animated choropleth map
+fig_map = px.choropleth(
+    emissions_long_1990_2022,
+    locations="country_code",
+    color="emissions",
+    hover_name="name",
+    animation_frame="year",
+    title="Global CO₂ Emissions (1990–2022)",
+    labels={
+        "emissions": "CO₂ emissions",
+        "year": "Year",
+    },
+)
+```
+
+# Results
+
+::: {.panel-tabset}
+
+## Table
+
+```{python}
+show(table_df)
+```
+
+## Chart
+
+```{python}
+fig_chart.show()
+```
+
+## Map
+
+```{python}
+fig_map.show()
+```
+
+:::
+
+# Deploying to GitHub Pages
+
+As a final step, follow the steps outlined in the prework to deploy the report to GitHub Pages. You will be asked to share a link to the report in the course portal.
