@@ -5,6 +5,8 @@ format:
   html:
     toc: true
 
+output-file: index.html
+
 execute:
   echo: false
   warning: false
